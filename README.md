@@ -100,7 +100,7 @@ MoesifAdvancedFilterConfiguration.setConfig(new CustomMoesifAdvancedConfig())
 ```
 Advanced configuration options are explained beloe
 
-### 1. `def skip(request: RequestHeader, result: Result): Boolean`
+#### 1. `def skip(request: RequestHeader, result: Result): Boolean`
 Return `true` if you want to skip logging a
 request to Moesif i.e. to skip boring requests like health probes.
 
@@ -111,10 +111,10 @@ request to Moesif i.e. to skip boring requests like health probes.
   }
 ```
 
-### 2. `def maskContent(moesifEventModel: EventModel): EventModel = moesifEventModel`
+#### 2. `def maskContent(moesifEventModel: EventModel): EventModel = moesifEventModel`
 If you want to remove any sensitive data in the HTTP headers or body before sending to Moesif, you can do so with `maskContent`
 
-### 3. `def identifyUser(request: RequestHeader, result: Result): Option[String]`
+#### 3. `def identifyUser(request: RequestHeader, result: Result): Option[String]`
 Highly recommended. Even though Moesif automatically detects the end userId if possible, setting this configuration
 ensures the highest accuracy with user attribution.
 
@@ -124,7 +124,7 @@ ensures the highest accuracy with user attribution.
   }
 ```
 
-### 4. `def identifyCompany(request: RequestHeader, result: Result): Option[String]`
+#### 4. `def identifyCompany(request: RequestHeader, result: Result): Option[String]`
 You can set this configuration to add company Id to the event.
 
 ```scala
