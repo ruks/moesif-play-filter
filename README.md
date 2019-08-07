@@ -152,3 +152,12 @@ to the event.
 
 To view more more documentation on integration options, please visit __[the Integration Options Documentation](https://www.moesif.com/docs/getting-started/integration-options/).__
 
+[ico-built-for]: https://img.shields.io/badge/play-play%20framework-green
+[ico-version]: https://api.bintray.com/packages/moesif/maven/moesif-play-filter/images/download.svg
+[ico-license]: https://img.shields.io/badge/License-Apache%202.0-green.svg
+[ico-source]: https://img.shields.io/github/last-commit/moesif/moesif-servlet.svg?style=social
+
+[link-built-for]: https://www.playframework.com/
+[link-package]: https://bintray.com/moesif/maven/moesif-play-filter/_latestVersion
+[link-license]: https://raw.githubusercontent.com/Moesif/moesif-play-filter/master/LICENSE
+[link-source]: https://github.com/moesif/moesif-play-filter
