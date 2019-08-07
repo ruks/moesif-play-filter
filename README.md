@@ -133,7 +133,7 @@ You can set this configuration to add company Id to the event.
   }
 ```
 
-### 5. `public String getSessionToken(HttpServletRequest request, HttpServletResponse response)`
+#### 5. `public String getSessionToken(HttpServletRequest request, HttpServletResponse response)`
 
 Moesif automatically detects the end user's session token or API key, but you can manually define the token for finer control.
 
@@ -143,7 +143,7 @@ Moesif automatically detects the end user's session token or API key, but you ca
   }
 ```
 
-### 6. `def getMetadata(request: RequestHeader, result: Result): Map[String, String] `
+#### 6. `def getMetadata(request: RequestHeader, result: Result): Map[String, String] `
 You can add any additional tags as needed
 to the event.
 
