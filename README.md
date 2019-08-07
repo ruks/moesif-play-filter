@@ -133,7 +133,7 @@ You can set this configuration to add company Id to the event.
   }
 ```
 
-#### 5. `public String getSessionToken(HttpServletRequest request, HttpServletResponse response)`
+#### 5. `def sessionToken(request: RequestHeader, result: Result): Option[String]`
 
 Moesif automatically detects the end user's session token or API key, but you can manually define the token for finer control.
 
