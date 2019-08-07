@@ -18,7 +18,9 @@ without importing framework specific dependencies. Any Web Application built on 
 
 #### sbt users
 
+```
 libraryDependencies += "com.moesif.filter" % "moesif-play-filter" % "1.0"
+```
 
 #### Maven users
 
