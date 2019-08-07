@@ -90,9 +90,10 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
 
             Try(MoesifBodyParser.parseBody(resultHeaders, utf8String)) match {
               case Success(bodyWrapper) if bodyWrapper.transferEncoding == "base64" =>
-                // play bytestring payload seems to be in UTF-16BE
-              val str = new String(Base64.encode(new String(resultBodyByteString.toArray, "UTF-16BE").getBytes, Base64.DEFAULT))
-                eventRspBuilder.body(str).transferEncoding("base64-Utf-16be")
+                // play bytestring payload seems to be in UTF-16BE, BodyParser converts to UTF string first,
+                // which corrupts the string, use the ByteString bytes directly
+                val str = new String(Base64.encode(resultBodyByteString.toArray, Base64.DEFAULT))
+                eventRspBuilder.body(str).transferEncoding(bodyWrapper.transferEncoding)
               case Success(bodyWrapper) =>
                 eventRspBuilder.body(bodyWrapper.body).transferEncoding(bodyWrapper.transferEncoding)
               case _ =>  eventRspBuilder.body(utf8String)
