@@ -16,6 +16,10 @@ without importing framework specific dependencies. Any Web Application built on 
 
 ## How to install
 
+#### sbt users
+
+libraryDependencies += "com.moesif.filter" % "moesif-play-filter" % "1.0"
+
 #### Maven users
 
 Add the Moesif dependency to your project's pom.xml file:
