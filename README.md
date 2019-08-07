@@ -16,7 +16,7 @@ without importing framework specific dependencies. Any Web Application built on 
 
 ## How to install
 
-#### sbt users
+#### Sbt users
 
 ```
 libraryDependencies += "com.moesif.filter" % "moesif-play-filter" % "1.0"
