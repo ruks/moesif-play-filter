@@ -98,7 +98,7 @@ import play.api.mvc.{RequestHeader, Result}
 
 class CustomMoesifAdvancedConfig extends MoesifAdvancedFilterConfiguration {
 
-  override def getMetadata(request: RequestHeader, result: Result): Map[String, String] = Map("customAttribute" -> "atrributeValue")
+  override def getMetadata(request: RequestHeader, result: Result): Map[String, Object] = Map("customAttribute" -> "atrributeValue")
 }
 
 // In you root play application initialization code set custom config
@@ -149,9 +149,9 @@ Moesif automatically detects the end user's session token or API key, but you ca
   }
 ```
 
-#### 6. `def getMetadata(request: RequestHeader, result: Result): Map[String, String] `
+#### 6. `def getMetadata(request: RequestHeader, result: Result): Map[String, Object] `
 You can add any additional tags as needed
-to the event.
+to the event. Ensure that returned metadata map is Json serializable
 
 
 ## Other integrations

@@ -2,7 +2,7 @@ package com.moesif.filter
 
 import java.util.Date
 
-import com.moesif.api.{APIHelper, Base64, MoesifAPIClient, BodyParser => MoesifBodyParser}
+import com.moesif.api.{Base64, MoesifAPIClient, BodyParser => MoesifBodyParser}
 import com.moesif.api.models.{EventBuilder, EventModel, EventRequestBuilder, EventResponseBuilder}
 import com.moesif.api.http.client.HttpContext
 import com.moesif.api.http.response.HttpResponse
@@ -122,8 +122,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
 
               val metadata = advancedConfig.getMetadata(requestHeader, result)
               if (metadata.nonEmpty) {
-                val metadataSerialized = APIHelper.deserialize(metadata.map { entry => s""""${entry._1}": "${entry._2}"""" }.mkString("{", ",", "}"))
-                eventModelBuilder.metadata(metadataSerialized)
+                eventModelBuilder.metadata(metadata)
               }
 
               val eventModel = eventModelBuilder.build()

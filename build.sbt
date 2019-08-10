@@ -1,9 +1,8 @@
 
 name := "moesif-play-filter"
+organization := "com.moesif.filter"
 
 version := "1.0"
-
-scalaVersion := "2.11.8"
 
 assemblyJarName in assembly := "moesif-play-filter-1.0.jar"
 
@@ -22,3 +21,7 @@ assemblyExcludedJars in assembly := {
     f.data.getName.contains("moesifapi")
   }
 }
+
+licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0"))
+crossPaths := false
+publishMavenStyle := true

@@ -21,7 +21,8 @@ trait MoesifAdvancedFilterConfiguration {
   // getMetadata is a function that takes a req and res and returns an object that allows you to
   // add custom metadata that will be associated with the req. The metadata must be a simple scala Map
   // For example, you may want to save a VM instance_id, a trace_id, or a tenant_id with the request.
-  def getMetadata(request: RequestHeader, result: Result): Map[String, String] = Map.empty
+  // Note Object must be json serializable.
+  def getMetadata(request: RequestHeader, result: Result): Map[String, Object] = Map.empty
 
 
   // From requestHeader and result, return session token
