@@ -64,7 +64,7 @@ The jars are available from a public [Bintray Jcenter](https://bintray.com/moesi
 
 ## How to use
 
-MoesifApiFilter can be enabled using play framework application configuration. More details [here]
+MoesifApiFilter can be enabled using play framework application configuration. More details [Default HTTP filters](https://www.playframework.com/documentation/latest/Filters) and [Scala Http filters](https://www.playframework.com/documentation/latest/ScalaHttpFilters) 
 
 In your play configuration file(default application.conf), enable MoesifApiFilter as below
 
