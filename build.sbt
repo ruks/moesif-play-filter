@@ -22,6 +22,16 @@ assemblyExcludedJars in assembly := {
   }
 }
 
-licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0"))
-crossPaths := false
+url("http://www.moesif.com/")
 publishMavenStyle := true
+licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0"))
+scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/Moesif/moesif-play-filter"),
+    "scm:git@github.com:Moesif/moesif-play-filter.git"
+  )
+)
+organizationName := "Moesif Inc"
+organizationHomepage := Some(url("http://www.moesif.com/"))
+developers += Developer("moesif", "Moesif API", "support@moesif.com", url("https://www.moesif.com"))
+crossPaths := false
