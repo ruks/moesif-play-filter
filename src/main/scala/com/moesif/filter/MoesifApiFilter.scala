@@ -59,9 +59,9 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
         None
       }
 
-      lazy val reqHeaders = requestHeader.headers.headers.toMap.asJava
+      val reqHeaders = requestHeader.headers.headers.toMap.asJava
 
-      lazy val eventReqWithoutBody = new EventRequestBuilder().time(new Date()).
+      val eventReqWithoutBody = new EventRequestBuilder().time(new Date()).
         uri(requestHeader.uri).
         verb(requestHeader.method).
         apiVersion(requestHeader.version).
