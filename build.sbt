@@ -2,7 +2,7 @@
 name := "moesif-play-filter"
 organization := "com.moesif.filter"
 
-version := "1.0"
+version := "1.1"
 
 assemblyJarName in assembly := "moesif-play-filter-1.0.jar"
 
