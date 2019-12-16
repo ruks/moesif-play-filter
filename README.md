@@ -285,7 +285,6 @@ filter.updateCompany(company);
 
 Similar to UpdateCompany, but used to update a list of companies in one batch. 
 Only the `company_id` field is required.
-This method is a convenient helper that calls the Moesif API lib.
 For details, visit the [Java API Reference](https://www.moesif.com/docs/api?java#update-companies-in-batch).
 
 ```java
