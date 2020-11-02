@@ -7,7 +7,7 @@
 
 ## Introduction
 
-`moesif-play-filter` is a Play framework Filter that logs API calls and sends to [Moesif](https://www.moesif.com) for API analytics and log analysis.
+`moesif-play-filter` is a Play framework Filter that logs API calls and sends to [Moesif](https://www.moesif.com) for API analytics and monitoring.
 
 The SDK is implemented as a [Scala HTTP Filter](https://www.playframework.com/documentation/latest/ScalaHttpFilters)
 without importing framework specific dependencies. Any Web Application built on Play can use this SDK with minimal configuration.
