@@ -12,7 +12,7 @@ assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeSca
 libraryDependencies += "com.moesif.api" % "moesifapi" % "1.6.9"
 
 // https://mvnrepository.com/artifact/com.typesafe.play/play
-libraryDependencies += "com.typesafe.play" %% "play" % "2.7.3"
+libraryDependencies += "com.typesafe.play" %% "play" % "2.6.23"
 
 
 assemblyExcludedJars in assembly := {
@@ -35,5 +35,5 @@ organizationHomepage := Some(url("http://www.moesif.com/"))
 developers += Developer("moesif", "Moesif API", "support@moesif.com", url("https://www.moesif.com"))
 crossPaths := false
 
-scalaVersion := "2.12.7"
+scalaVersion := "2.11.8"
 crossScalaVersions := Seq("2.13.1", "2.12.7", "2.11.8")
