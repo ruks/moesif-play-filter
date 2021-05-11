@@ -32,6 +32,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   private val requestBodyParsingEnabled = config.requestBodyProcessingEnabled
   private val maxApiEventsToHoldInMemory = config.maxApiEventsToHoldInMemory
   private val moesifApplicationId = config.moesifApplicationId
+  private val moesifCollectorEndpoint = config.moesifCollectorEndpoint
   private val eventModelBuffer = mutable.ArrayBuffer[EventModel]()
 
 
@@ -143,7 +144,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   def sendEvent(eventModel: EventModel): Unit = synchronized {
     eventModelBuffer += eventModel
     if (eventModelBuffer.size >= maxApiEventsToHoldInMemory) {
-      val client = new MoesifAPIClient(moesifApplicationId)
+      val client = new MoesifAPIClient(moesifApplicationId, moesifCollectorEndpoint)
       val api = client.getAPI
 
       val callBack = new APICallBack[HttpResponse] {
