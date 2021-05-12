@@ -2,8 +2,6 @@
 name := "moesif-play-filter"
 organization := "com.moesif.filter"
 
-version := "1.3"
-
 assemblyJarName in assembly := "moesif-play-filter-1.0.jar"
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
@@ -32,6 +30,7 @@ scmInfo := Some(
 )
 organizationName := "Moesif Inc"
 organizationHomepage := Some(url("http://www.moesif.com/"))
+homepage := Some(url("https://github.com/Moesif/moesif-play-filter"))
 developers += Developer("moesif", "Moesif API", "support@moesif.com", url("https://www.moesif.com"))
 crossPaths := false
 

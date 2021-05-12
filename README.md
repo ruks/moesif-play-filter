@@ -19,7 +19,7 @@ without importing framework specific dependencies. Any Web Application built on 
 For SBT users, add dependency to your `build.sbt`:
 
 ```bash
-libraryDependencies += "com.moesif.filter" % "moesif-play-filter" % "1.1"
+libraryDependencies += "com.moesif.filter" % "moesif-play-filter" % "1.5"
 ```
 
 For Maven users, add dependency to your `pom.xml`:
@@ -28,26 +28,21 @@ For Maven users, add dependency to your `pom.xml`:
 <dependency>
     <groupId>com.moesif.filter</groupId>
     <artifactId>moesif-play-filter</artifactId>
-    <version>1.1</version>
+    <version>1.5</version>
 </dependency>
 ```
 
 For Gradle users, add the Moesif dependency to your project's build.gradle file:
 
 ```gradle
-// Include jcenter repository if you don't already have it.
-repositories {
-    jcenter()
-}
- 
 dependencies {   
-    compile 'com.moesif.filter:moesif-play-filter:1.1'
+    compile 'com.moesif.filter:moesif-play-filter:1.5'
 }
 ```
 
 #### Others
 
-The jars are available from a public [Bintray Jcenter](https://bintray.com/moesif/maven/moesif-servlet) repository.
+The jars are available from a public [repo.maven.apache.org - moesif-play-filter](https://repo.maven.apache.org/maven2/com/moesif/filter/moesif-play-filter/) repository.
 
 
 ## How to use
