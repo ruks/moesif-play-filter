@@ -9,7 +9,7 @@ import com.moesif.api.http.response.HttpResponse
 import com.moesif.api.http.client.APICallBack
 import java.util.logging._
 
-import play.api.{Configuration}
+import play.api.Configuration
 import play.api.inject.{SimpleModule, bind}
 
 import scala.collection.JavaConverters._
@@ -20,9 +20,10 @@ import akka.stream.{Attributes, FlowShape, Materializer}
 import akka.util.ByteString
 import play.api.libs.streams.Accumulator
 import play.api.mvc.{EssentialAction, EssentialFilter, RequestHeader, Result}
+import play.libs.Scala
 
 import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 /**
   * MoesifApiFilter
   * logs API calls and sends to Moesif for API analytics and log analysis.
@@ -33,8 +34,8 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   private val maxApiEventsToHoldInMemory = config.maxApiEventsToHoldInMemory
   private val moesifApplicationId = config.moesifApplicationId
   private val moesifCollectorEndpoint = config.moesifCollectorEndpoint
+  private val samplingPercentage = config.samplingPercentage
   private val eventModelBuffer = mutable.ArrayBuffer[EventModel]()
-
 
   private val logger = Logger.getLogger("moesif.play.filter.MoesifApiFilter")
   logger.info(s"config  is $config")
@@ -142,22 +143,26 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
 
 
   def sendEvent(eventModel: EventModel): Unit = synchronized {
-    eventModelBuffer += eventModel
-    if (eventModelBuffer.size >= maxApiEventsToHoldInMemory) {
-      val client = new MoesifAPIClient(moesifApplicationId, moesifCollectorEndpoint)
-      val api = client.getAPI
+    if ((Math.abs(Random.nextInt()) % 100) < samplingPercentage) {
+      eventModel.setWeight(math.floor(100 / samplingPercentage).toInt) // note: samplingPercentage cannot be 0 at this point
+      eventModelBuffer += eventModel
+      if (eventModelBuffer.size >= maxApiEventsToHoldInMemory) {
+        val client = new MoesifAPIClient(moesifApplicationId, moesifCollectorEndpoint)
+        val api = client.getAPI
 
-      val callBack = new APICallBack[HttpResponse] {
-        def onSuccess(context: HttpContext, response: HttpResponse): Unit = {
-          if (context.getResponse.getStatusCode != 201) {
-            logger.log(Level.WARNING, s"Moesif server returned status:${context.getResponse.getStatusCode} while sending API events")
+        val callBack = new APICallBack[HttpResponse] {
+          def onSuccess(context: HttpContext, response: HttpResponse): Unit = {
+            if (context.getResponse.getStatusCode != 201) {
+              logger.log(Level.WARNING, s"Moesif server returned status:${context.getResponse.getStatusCode} while sending API events")
+            }
+          }
+
+          def onFailure(context: HttpContext, ex: Throwable): Unit = {
+            logger.log(Level.WARNING, s"failed to send API events to Moesif: ${ex.getMessage}", ex)
           }
         }
-        def onFailure(context: HttpContext, ex: Throwable): Unit = {
-          logger.log(Level.WARNING, s"failed to send API events to Moesif: ${ex.getMessage}", ex)
-        }
+        api.createEventsBatchAsync(eventModelBuffer.asJava, callBack)
       }
-      api.createEventsBatchAsync(eventModelBuffer.asJava, callBack)
     }
   }
 
