@@ -10,7 +10,8 @@ import play.api.Configuration
   *                            will be displayed during the onboarding steps. You can always find your Moesif Application Id at any time by logging
   *                            into the Moesif Portal, click on the top right menu, and then clicking Installation.
   */
-case class MoesifApiFilterConfig(maxApiEventsToHoldInMemory: Int, moesifApplicationId: String, requestBodyProcessingEnabled: Boolean = true, moesifCollectorEndpoint: String)
+case class MoesifApiFilterConfig(maxApiEventsToHoldInMemory: Int, moesifApplicationId: String, requestBodyProcessingEnabled: Boolean = true,
+                                 moesifCollectorEndpoint: String, samplingPercentage: Int)
 object MoesifApiFilterConfig {
   def fromConfiguration(conf: Configuration): MoesifApiFilterConfig = {
     val config = conf.get[Configuration]("play.filters.moesifApiFilter")
@@ -18,7 +19,8 @@ object MoesifApiFilterConfig {
     val reqBodyProcessing = config.getOptional[Boolean]("requestBodyProcessingEnabled").getOrElse(false)
     val moesifApplicationId = config.get[String]("moesifApplicationId")
     val moesifCollectorEndpoint = config.get[String]("collectorEndpoint")
-    MoesifApiFilterConfig(maxApiEventsToHoldInMemory, moesifApplicationId, reqBodyProcessing, moesifCollectorEndpoint)
+    val samplingPercentage = config.getOptional[Int]("samplingPercentage")
+    MoesifApiFilterConfig(maxApiEventsToHoldInMemory, moesifApplicationId, reqBodyProcessing, moesifCollectorEndpoint, samplingPercentage.getOrElse(100))
   }
 }
 
