@@ -161,7 +161,9 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
             logger.log(Level.WARNING, s"failed to send API events to Moesif: ${ex.getMessage}", ex)
           }
         }
-        api.createEventsBatchAsync(eventModelBuffer.asJava, callBack)
+        val events = eventModelBuffer.asJava
+        api.createEventsBatchAsync(events, callBack)
+        eventModelBuffer.clear()
       }
     }
   }
