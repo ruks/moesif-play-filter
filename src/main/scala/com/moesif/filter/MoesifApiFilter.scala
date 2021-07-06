@@ -7,6 +7,7 @@ import com.moesif.api.models.{EventBuilder, EventModel, EventRequestBuilder, Eve
 import com.moesif.api.http.client.HttpContext
 import com.moesif.api.http.response.HttpResponse
 import com.moesif.api.http.client.APICallBack
+import com.moesif.api.models.AppConfigModel
 import java.util.logging._
 
 import play.api.Configuration
@@ -18,6 +19,9 @@ import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Materializer}
 import akka.util.ByteString
+import com.moesif.api.controllers.APIController
+import org.joda.time.format.DateTimeFormat
+import org.joda.time.{DateTime, DateTimeZone}
 import play.api.libs.streams.Accumulator
 import play.api.mvc.{EssentialAction, EssentialFilter, RequestHeader, Result}
 import play.libs.Scala
@@ -36,9 +40,47 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   private val moesifCollectorEndpoint = config.moesifCollectorEndpoint
   private val samplingPercentage = config.samplingPercentage
   private val eventModelBuffer = mutable.ArrayBuffer[EventModel]()
+  private val client = new MoesifAPIClient(moesifApplicationId, moesifCollectorEndpoint)
+  private val moesifApi = client.getAPI
+  private var lastTimeAppConfigFetched: DateTime = DateTime.parse("1970-01-01", DateTimeFormat.forPattern("yyyy-MM-dd"))
+  private var isAppConfigFetched: Boolean = false
+  private var appConfigModel = new AppConfigModel
 
   private val logger = Logger.getLogger("moesif.play.filter.MoesifApiFilter")
   logger.info(s"config  is $config")
+
+  def getSampleRateToUse(userId: String, companyId: String): Int = {
+    var sampleRate = appConfigModel.getSampleRate
+    if (userId != null && appConfigModel.getUserSampleRate.containsKey(userId)) sampleRate = appConfigModel.getUserSampleRate.get(userId)
+    else if (companyId != null && appConfigModel.getCompanySampleRate.containsKey(companyId)) sampleRate = appConfigModel.getCompanySampleRate.get(companyId)
+    sampleRate
+  }
+
+  def getApplicationConfig() = {
+
+    if (!isAppConfigFetched || DateTime.now(DateTimeZone.UTC).isAfter(lastTimeAppConfigFetched.plusMinutes(5))) {
+      isAppConfigFetched = true
+      lastTimeAppConfigFetched = DateTime.now(DateTimeZone.UTC)
+
+      try {
+        val configApiResponse = moesifApi.getAppConfig
+        val respBodyIs = configApiResponse.getRawBody
+        val newConfig = APIController.parseAppConfigModel(respBodyIs)
+        respBodyIs.close()
+        appConfigModel = newConfig
+      } catch {
+          case e: Throwable => {
+            println("Exception while fetching application config, setting sample rate to 100")
+            println(e)
+            println(e.getMessage)
+            println(e.printStackTrace())
+            appConfigModel.setSampleRate(100)
+          }
+      }
+    } else {
+      println("No need to fetch app config")
+    }
+  }
 
   def apply(nextFilter: EssentialAction) = new EssentialAction {
 
@@ -130,6 +172,9 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
               val eventModel = eventModelBuilder.build()
               val eventModelMasked = advancedConfig.maskContent(eventModel)
               sendEvent(eventModelMasked)
+
+              // Calling func to fetch application configuration if needed
+              getApplicationConfig()
             }
           }
         } match {
@@ -145,10 +190,18 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   def sendEvent(eventModel: EventModel): Unit = synchronized {
     if ((Math.abs(Random.nextInt()) % 100) < samplingPercentage) {
       eventModel.setWeight(math.floor(100 / samplingPercentage).toInt) // note: samplingPercentage cannot be 0 at this point
-      eventModelBuffer += eventModel
+
+      val sampleRateToUse = getSampleRateToUse(eventModel.getUserId, eventModel.getCompanyId)
+      val randomPercentage = Math.random * 100
+
+      // Compare percentage to send event
+      if (sampleRateToUse >= randomPercentage) {
+        eventModelBuffer += eventModel
+      } else {
+        println("Skipped Event due to SamplingPercentage - " + sampleRateToUse.toString + " and randomPercentage " + randomPercentage.toString)
+      }
+
       if (eventModelBuffer.size >= maxApiEventsToHoldInMemory) {
-        val client = new MoesifAPIClient(moesifApplicationId, moesifCollectorEndpoint)
-        val api = client.getAPI
 
         val callBack = new APICallBack[HttpResponse] {
           def onSuccess(context: HttpContext, response: HttpResponse): Unit = {
@@ -162,7 +215,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
           }
         }
         val events = eventModelBuffer.asJava
-        api.createEventsBatchAsync(events, callBack)
+        moesifApi.createEventsBatchAsync(events, callBack)
         eventModelBuffer.clear()
       }
     }
