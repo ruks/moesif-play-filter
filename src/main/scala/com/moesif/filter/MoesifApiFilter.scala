@@ -12,7 +12,9 @@ import java.util.logging._
 
 import play.api.Configuration
 import play.api.inject.{SimpleModule, bind}
-
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
 import javax.inject.{Inject, Singleton}
 import akka.stream.scaladsl.Flow
@@ -46,14 +48,20 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   private var isAppConfigFetched: Boolean = false
   private var appConfigModel = new AppConfigModel
 
+  val appConfigRunnable: Runnable = new Runnable() {
+    override def run(): Unit = {
+      getApplicationConfig()
+    }
+  }
+  // Create an executor to fetch application config every 5 minutes
+  val exec: ScheduledExecutorService = Executors.newScheduledThreadPool(1)
+  exec.scheduleAtFixedRate(appConfigRunnable, 0, 5, TimeUnit.MINUTES)
+
   private val logger = Logger.getLogger("moesif.play.filter.MoesifApiFilter")
   logger.info(s"config  is $config")
 
   def getSampleRateToUse(userId: String, companyId: String): Int = {
-    var sampleRate = appConfigModel.getSampleRate
-    if (userId != null && appConfigModel.getUserSampleRate.containsKey(userId)) sampleRate = appConfigModel.getUserSampleRate.get(userId)
-    else if (companyId != null && appConfigModel.getCompanySampleRate.containsKey(companyId)) sampleRate = appConfigModel.getCompanySampleRate.get(companyId)
-    sampleRate
+    appConfigModel.getUserSampleRate.getOrDefault(userId, appConfigModel.getCompanySampleRate.getOrDefault(companyId, appConfigModel.getSampleRate))
   }
 
   def getApplicationConfig() = {
@@ -173,8 +181,6 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
               val eventModelMasked = advancedConfig.maskContent(eventModel)
               sendEvent(eventModelMasked)
 
-              // Calling func to fetch application configuration if needed
-              getApplicationConfig()
             }
           }
         } match {
