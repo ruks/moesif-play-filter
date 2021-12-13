@@ -12,6 +12,10 @@ libraryDependencies += "com.moesif.api" % "moesifapi" % "1.6.13"
 // https://mvnrepository.com/artifact/com.typesafe.play/play
 libraryDependencies += "com.typesafe.play" %% "play" % "2.6.23"
 
+// dont use log4j lower than 2.15 due to Log4j for CVE-2021-44228
+libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.15.0"
+libraryDependencies += "org.apache.logging.log4j" % "log4j-api" % "2.15.0"
+
 
 assemblyExcludedJars in assembly := {
   val cp = (fullClasspath in assembly).value
