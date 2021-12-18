@@ -1,32 +1,26 @@
 package com.moesif.filter
 
-import java.util.Date
-
-import com.moesif.api.{Base64, MoesifAPIClient, BodyParser => MoesifBodyParser}
-import com.moesif.api.models.{EventBuilder, EventModel, EventRequestBuilder, EventResponseBuilder}
-import com.moesif.api.http.client.HttpContext
-import com.moesif.api.http.response.HttpResponse
-import com.moesif.api.http.client.APICallBack
-import com.moesif.api.models.AppConfigModel
-import java.util.logging._
-
-import play.api.Configuration
-import play.api.inject.{SimpleModule, bind}
-
-import java.util.concurrent.{Executors, ScheduledExecutorService, ScheduledFuture, TimeUnit}
-import scala.collection.JavaConverters._
-import javax.inject.{Inject, Singleton}
 import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Materializer}
 import akka.util.ByteString
 import com.moesif.api.controllers.APIController
+import com.moesif.api.http.client.{APICallBack, HttpContext}
+import com.moesif.api.http.response.HttpResponse
+import com.moesif.api.models._
+import com.moesif.api.{Base64, MoesifAPIClient, BodyParser => MoesifBodyParser}
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, DateTimeZone}
+import play.api.Configuration
+import play.api.inject.{SimpleModule, bind}
 import play.api.libs.streams.Accumulator
 import play.api.mvc.{EssentialAction, EssentialFilter, RequestHeader, Result}
-import play.libs.Scala
 
+import java.util.Date
+import java.util.concurrent.{Executors, ScheduledExecutorService, ScheduledFuture, TimeUnit}
+import java.util.logging._
+import javax.inject.{Inject, Singleton}
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.util.{Failure, Random, Success, Try}
 /**

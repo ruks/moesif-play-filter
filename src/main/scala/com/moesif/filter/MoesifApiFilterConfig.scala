@@ -1,7 +1,8 @@
 package com.moesif.filter
 
-import javax.inject.{Inject, Provider, Singleton}
 import play.api.Configuration
+
+import javax.inject.{Inject, Provider, Singleton}
 
 /**
   * Configuration for the moesif api filter
