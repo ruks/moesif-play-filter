@@ -35,7 +35,6 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   private var lastSendTime = System.currentTimeMillis()
   private val moesifApplicationId = config.moesifApplicationId
   private val moesifCollectorEndpoint = config.moesifCollectorEndpoint
-  private val samplingPercentage = config.samplingPercentage
   private val eventModelBuffer = mutable.ArrayBuffer[EventModel]()
   private val client = new MoesifAPIClient(moesifApplicationId, moesifCollectorEndpoint)
   private val moesifApi = client.getAPI
@@ -182,6 +181,9 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
               sendEvent(eventModelMasked)
 
             }
+            else{
+              println("This is not skipped requestHeader: " + requestHeader  + " result: " + result)
+            }
           }
         } match {
           case Success(_) => Unit
@@ -194,17 +196,15 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
 
 
   def sendEvent(eventModel: EventModel): Unit = synchronized {
-    if ((Math.abs(Random.nextInt()) % 100) < samplingPercentage) {
-      eventModel.setWeight(math.floor(100 / samplingPercentage).toInt) // note: samplingPercentage cannot be 0 at this point
-
-      val sampleRateToUse = getSampleRateToUse(eventModel.getUserId, eventModel.getCompanyId)
       val randomPercentage = Math.random * 100
+      val sampleRateToUse = getSampleRateToUse(eventModel.getUserId, eventModel.getCompanyId)
 
       // Compare percentage to send event
       if (sampleRateToUse >= randomPercentage) {
+        eventModel.setWeight(math.floor(100 / sampleRateToUse).toInt) // note: sampleRateToUse cannot be 0 at this point
         eventModelBuffer += eventModel
       } else {
-        println("Skipped Event due to SamplingPercentage - " + sampleRateToUse.toString + " and randomPercentage " + randomPercentage.toString)
+        println("Skipped Event due to sampleRateToUse - " + sampleRateToUse.toString + " and randomPercentage " + randomPercentage.toString)
       }
 
       // scheduledSend below should flush the event buffer after maxBatchTime; however, we check the time here and
@@ -217,7 +217,6 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
         if (!isSendScheduled())
           scheduleBufferFlush()
       }
-    }
   }
 
   def isAfterMaxBatchTime(): Boolean = System.currentTimeMillis() - lastSendTime > maxBatchTime
