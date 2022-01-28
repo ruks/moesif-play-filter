@@ -181,9 +181,6 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
               sendEvent(eventModelMasked)
 
             }
-            else{
-              println("This is not skipped requestHeader: " + requestHeader  + " result: " + result)
-            }
           }
         } match {
           case Success(_) => Unit
