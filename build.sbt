@@ -7,14 +7,14 @@ assemblyJarName in assembly := "moesif-play-filter-1.0.jar"
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
 
 // https://mvnrepository.com/artifact/com.moesif.api/moesifapi
-libraryDependencies += "com.moesif.api" % "moesifapi" % "1.6.17"
+libraryDependencies += "com.moesif.api" % "moesifapi" % "1.7.4"
 
 // https://mvnrepository.com/artifact/com.typesafe.play/play
 libraryDependencies += "com.typesafe.play" %% "play" % "2.6.23"
 
 // dont use log4j lower than 2.17 due to Log4j for CVE-2021-45105
-libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.17.0"
-libraryDependencies += "org.apache.logging.log4j" % "log4j-api" % "2.17.0"
+libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.17.2"
+libraryDependencies += "org.apache.logging.log4j" % "log4j-api" % "2.17.2"
 
 
 assemblyExcludedJars in assembly := {

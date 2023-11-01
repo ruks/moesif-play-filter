@@ -4,13 +4,10 @@ import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Materializer}
 import akka.util.ByteString
-import com.moesif.api.controllers.APIController
 import com.moesif.api.http.client.{APICallBack, HttpContext}
 import com.moesif.api.http.response.HttpResponse
 import com.moesif.api.models._
 import com.moesif.api.{Base64, MoesifAPIClient, BodyParser => MoesifBodyParser}
-import org.joda.time.format.DateTimeFormat
-import org.joda.time.{DateTime, DateTimeZone}
 import play.api.Configuration
 import play.api.inject.{SimpleModule, bind}
 import play.api.libs.streams.Accumulator
@@ -39,56 +36,18 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   private val eventModelBuffer = mutable.ArrayBuffer[EventModel]()
   private val client = new MoesifAPIClient(moesifApplicationId, moesifCollectorEndpoint)
   private val moesifApi = client.getAPI
-  private var lastTimeAppConfigFetched: DateTime = DateTime.parse("1970-01-01", DateTimeFormat.forPattern("yyyy-MM-dd"))
-  private var isAppConfigFetched: Boolean = false
-  private var appConfigModel = new AppConfigModel
 
-  val appConfigRunnable: Runnable = new Runnable() {
-    override def run(): Unit = {
-      getApplicationConfig()
-    }
-  }
   val eventBufferFlusher: Runnable = new Runnable() {
     override def run(): Unit = flushEventBuffer()
   }
   // Create an executor to fetch application config every 5 minutes
   val exec: ScheduledExecutorService = Executors.newScheduledThreadPool(1)
-  exec.scheduleAtFixedRate(appConfigRunnable, 0, 5, TimeUnit.MINUTES)
   // Initialize with a ScheduledFuture[_] that fires immediately, doing nothing
   private var scheduledSend: ScheduledFuture[_] = exec.schedule(eventBufferFlusher, 0, TimeUnit.MILLISECONDS)
 
   private val logger = Logger.getLogger("moesif.play.filter.MoesifApiFilter")
   logger.info(s"config  is $config")
 
-  def getSampleRateToUse(userId: String, companyId: String): Int = {
-    appConfigModel.getUserSampleRate.getOrDefault(userId, appConfigModel.getCompanySampleRate.getOrDefault(companyId, appConfigModel.getSampleRate))
-  }
-
-  def getApplicationConfig() = {
-
-    if (!isAppConfigFetched || DateTime.now(DateTimeZone.UTC).isAfter(lastTimeAppConfigFetched.plusMinutes(5))) {
-      isAppConfigFetched = true
-      lastTimeAppConfigFetched = DateTime.now(DateTimeZone.UTC)
-
-      try {
-        val configApiResponse = moesifApi.getAppConfig
-        val respBodyIs = configApiResponse.getRawBody
-        val newConfig = APIController.parseAppConfigModel(respBodyIs)
-        respBodyIs.close()
-        appConfigModel = newConfig
-      } catch {
-          case e: Throwable => {
-            println("Exception while fetching application config, setting sample rate to 100")
-            println(e)
-            println(e.getMessage)
-            println(e.printStackTrace())
-            appConfigModel.setSampleRate(100)
-          }
-      }
-    } else {
-      println("No need to fetch app config")
-    }
-  }
 
   def apply(nextFilter: EssentialAction) = new EssentialAction {
 
@@ -114,7 +73,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
       val reqHeaders = requestHeader.headers.headers.toMap.asJava
 
       val eventReqWithoutBody = new EventRequestBuilder().time(new Date()).
-        uri(requestHeader.uri).
+        uri(MoesifApiFilter.buildUri(requestHeader)).
         verb(requestHeader.method).
         apiVersion(requestHeader.version).
         ipAddress(requestHeader.remoteAddress).
@@ -178,8 +137,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
               }
 
               val eventModel = eventModelBuilder.build()
-              val eventModelMasked = advancedConfig.maskContent(eventModel)
-              sendEvent(eventModelMasked)
+              sendEvent(eventModel, advancedConfig)
 
             }
           }
@@ -193,14 +151,16 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   }
 
 
-  def sendEvent(eventModel: EventModel): Unit = synchronized {
+  def sendEvent(eventModel: EventModel, advancedConfig: MoesifAdvancedFilterConfiguration): Unit = synchronized {
       val randomPercentage = Math.random * 100
-      val sampleRateToUse = getSampleRateToUse(eventModel.getUserId, eventModel.getCompanyId)
+      val sampleRateToUse = moesifApi.getSampleRateToUse(eventModel)
+
+      val eventModelMasked = advancedConfig.maskContent(eventModel)
 
       // Compare percentage to send event
       if (sampleRateToUse >= randomPercentage) {
-        eventModel.setWeight(math.floor(100 / sampleRateToUse).toInt) // note: sampleRateToUse cannot be 0 at this point
-        eventModelBuffer += eventModel
+        eventModelMasked.setWeight(math.floor(100 / sampleRateToUse).toInt) // note: sampleRateToUse cannot be 0 at this point
+        eventModelBuffer += eventModelMasked
       } else {
         if(debug) {
           logger.log(Level.INFO, "Skipped Event due to sampleRateToUse - " + sampleRateToUse.toString + " and randomPercentage " + randomPercentage.toString)
@@ -300,4 +260,25 @@ trait MoesifApiFilterComponents {
 
   lazy val moesifApiFilterConfig: MoesifApiFilterConfig = MoesifApiFilterConfig.fromConfiguration(configuration)
   lazy val moesifApiFilter: MoesifApiFilter             = new MoesifApiFilter(moesifApiFilterConfig)(materializer)
+}
+
+object MoesifApiFilter{
+  def buildUriHelper(host: String, uri: String, secure: Boolean): String = {
+    if (uri.contains("://")) {
+      uri
+    }
+    else {
+      val protocol = if (secure) "https://" else "http://"
+
+      // Add "/" if requestHeader.uri(route) is not start with "/"
+      val route = if (uri.startsWith("/")) uri else "/" + uri
+
+      protocol + host + route
+    }
+  }
+
+  def buildUri(requestHeader: RequestHeader): String = {
+    buildUriHelper(requestHeader.host, requestHeader.uri, requestHeader.secure)
+  }
+
 }
