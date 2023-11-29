@@ -24,7 +24,7 @@ object MoesifApiFilterConfig {
     val moesifApplicationId = config.get[String]("moesifApplicationId")
     val moesifCollectorEndpoint = config.get[String]("collectorEndpoint")
     val useGzip = config.getOptional[Boolean]("useGzip").getOrElse(false)
-    MoesifApiFilterConfig(maxApiEventsToHoldInMemory, moesifApplicationId, reqBodyProcessing, moesifCollectorEndpoint, maxBatchTime, debug)
+    MoesifApiFilterConfig(maxApiEventsToHoldInMemory, moesifApplicationId, reqBodyProcessing, moesifCollectorEndpoint, maxBatchTime, useGzip, debug)
   }
 }
 
