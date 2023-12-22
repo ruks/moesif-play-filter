@@ -36,6 +36,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   private val eventModelBuffer = mutable.ArrayBuffer[EventModel]()
   private val client = new MoesifAPIClient(moesifApplicationId, moesifCollectorEndpoint)
   private val moesifApi = client.getAPI
+  private val useGzip = config.useGzip
 
   val eventBufferFlusher: Runnable = new Runnable() {
     override def run(): Unit = {
@@ -245,12 +246,40 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
           }
         }
         def onFailure(context: HttpContext, ex: Throwable): Unit = {
+          logger.log(Level.WARNING, "[moesif] DEBUG events sent ...")
+          if(eventModelBuffer.nonEmpty){
+            val event = eventModelBuffer.head
+            if (ex.getMessage.contains("failed to respond") || ex.getMessage.contains("api-dev.moesif.net:443")) {
+
+              val reqUrl = Try(event.getRequest.getUri).getOrElse("NotAvailable")
+              val reqBody = Try(event.getRequest.getBody).getOrElse("NotAvailable")
+              val reqHeader = Try(event.getRequest.getHeaders).getOrElse("NotAvailable")
+
+              logger.log(Level.WARNING, s"reqUrl: $reqUrl")
+              logger.log(Level.WARNING, s"reqBody: $reqBody")
+              logger.log(Level.WARNING, s"reqHeader: $reqHeader")
+
+              if (event.getResponse == null) {
+                logger.log(Level.WARNING, "event.getResponse is null")
+              } else {
+                val respStatus = Try(event.getResponse.getStatus).getOrElse("NotAvailable")
+                val respBody = Try(event.getResponse.getBody).getOrElse("NotAvailable")
+                val respHeader = Try(event.getResponse.getHeaders).getOrElse("NotAvailable")
+
+                logger.log(Level.WARNING, s"-----------------------------------------------------------------")
+                logger.log(Level.WARNING, s"respStatus: $respStatus")
+                logger.log(Level.WARNING, s"respHeader: $respHeader")
+                logger.log(Level.WARNING, s"respBody: $respBody")
+              }
+            }
+          }
+
           logger.log(Level.WARNING, s"[Moesif] failed to send API events [flushSize: ${flushSize}/${maxApiEventsToHoldInMemory}] [ArrayBuffer size: ${eventModelBuffer.size}] to Moesif: ${ex.getMessage}", ex)
           setScheduleBufferFlush()
         }
       }
       val events = eventModelBuffer.asJava
-      moesifApi.createEventsBatchAsync(events, callBack)
+      moesifApi.createEventsBatchAsync(events, callBack, useGzip)
     }
   }
 
