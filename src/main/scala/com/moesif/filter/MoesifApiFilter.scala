@@ -9,6 +9,7 @@ import com.moesif.api.http.response.HttpResponse
 import com.moesif.api.models._
 import com.moesif.api.{Base64, MoesifAPIClient, BodyParser => MoesifBodyParser}
 import play.api.Configuration
+import play.api.http.HttpEntity
 import play.api.inject.{SimpleModule, bind}
 import play.api.libs.streams.Accumulator
 import play.api.mvc.{EssentialAction, EssentialFilter, RequestHeader, Result}
@@ -28,6 +29,7 @@ import scala.util.{Failure, Random, Success, Try}
 class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Materializer) extends  EssentialFilter  {
   private val requestBodyParsingEnabled = config.requestBodyProcessingEnabled
   private val maxApiEventsToHoldInMemory = config.maxApiEventsToHoldInMemory
+  private val batchSize = config.batchSize
   private val maxBatchTime = config.maxBatchTime
   private var lastSendTime = System.currentTimeMillis()
   private val moesifApplicationId = config.moesifApplicationId
@@ -96,62 +98,89 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
           eventReqWithoutBody.build()
       }
 
+      var blockedModifiedResultOpt: Option[Result] = None
+
       accumulator.map { result =>
-        Try {
-          result.body.consumeData.map { resultBodyByteString =>
-            val resultHeaders = result.header.headers.asJava
-            val eventRspBuilder  = new EventResponseBuilder().time(new Date()).
-              status(result.header.status).
-              headers(resultHeaders)
-            val utf8String = resultBodyByteString.utf8String
+        val resultHeaders = result.header.headers.asJava
+        val eventRspBuilder = new EventResponseBuilder().time(new Date()).
+          status(result.header.status).
+          headers(resultHeaders)
 
-            Try(MoesifBodyParser.parseBody(resultHeaders, utf8String)) match {
-              case Success(bodyWrapper) if bodyWrapper.transferEncoding == "base64" =>
-                // play bytestring payload seems to be in UTF-16BE, BodyParser converts to UTF string first,
-                // which corrupts the string, use the ByteString bytes directly
-                val str = new String(Base64.encode(resultBodyByteString.toArray, Base64.DEFAULT))
-                eventRspBuilder.body(str).transferEncoding(bodyWrapper.transferEncoding)
-              case Success(bodyWrapper) =>
-                eventRspBuilder.body(bodyWrapper.body).transferEncoding(bodyWrapper.transferEncoding)
-              case _ =>  eventRspBuilder.body(utf8String)
-            }
+        val eventModelBuilder = new EventBuilder().
+          request(eventReqWithBody).
+          response(eventRspBuilder.build())
 
-            val eventModelBuilder = new EventBuilder().
-              request(eventReqWithBody).
-              response(eventRspBuilder.build())
-            
-            val advancedConfig = MoesifAdvancedFilterConfiguration.getConfig().getOrElse{
-              MoesifAdvancedFilterConfiguration.getDefaultConfig()
-            }
+        val advancedConfig = MoesifAdvancedFilterConfiguration.getConfig().getOrElse {
+          MoesifAdvancedFilterConfiguration.getDefaultConfig()
+        }
 
-            if (!advancedConfig.skip(requestHeader, result)) {
-              advancedConfig.sessionToken(requestHeader, result).map { sessionToken =>
-                eventModelBuilder.sessionToken(sessionToken)
+        if (!advancedConfig.skip(requestHeader, result)) {
+          advancedConfig.sessionToken(requestHeader, result).map { sessionToken =>
+            eventModelBuilder.sessionToken(sessionToken)
+          }
+
+          advancedConfig.identifyUser(requestHeader, result).map { userId =>
+            eventModelBuilder.userId(userId)
+          }
+
+          advancedConfig.identifyCompany(requestHeader, result).map { companyId =>
+            eventModelBuilder.companyId(companyId)
+          }
+
+          val metadata = advancedConfig.getMetadata(requestHeader, result)
+          if (metadata.nonEmpty) {
+            eventModelBuilder.metadata(metadata)
+          }
+
+          val eventModel: EventModel = eventModelBuilder.build()
+
+          val blockResponse = moesifApi.getBlockedByGovernanceRulesResponse(eventModel)
+          if (blockResponse.isBlocked) {
+            logger.warning("Blocked by governance rules" + blockResponse.blockedBy)
+            eventModel.setBlockedBy(blockResponse.blockedBy)
+            eventModel.setResponse(blockResponse.response)
+
+            blockedModifiedResultOpt = Some(result.copy(
+              header = result.header.copy(
+                status = eventModel.getResponse.getStatus,
+                headers = eventModel.getResponse.getHeaders.asScala.toMap
+              ),
+              body = HttpEntity.Strict(ByteString(eventModel.getResponse.getBody.toString), result.body.contentType)
+            ))
+          }
+          else{
+            result.body.consumeData.map { resultBodyByteString =>
+              val utf8String = resultBodyByteString.utf8String
+
+              Try(MoesifBodyParser.parseBody(resultHeaders, utf8String)) match {
+                case Success(bodyWrapper) if bodyWrapper.transferEncoding == "base64" =>
+                  // play bytestring payload seems to be in UTF-16BE, BodyParser converts to UTF string first,
+                  // which corrupts the string, use the ByteString bytes directly
+                  val str = new String(Base64.encode(resultBodyByteString.toArray, Base64.DEFAULT))
+                  eventModel.getResponse.setBody(str)
+                  eventModel.getResponse.setTransferEncoding(bodyWrapper.transferEncoding)
+                case Success(bodyWrapper) =>
+                  eventModel.getResponse.setBody(bodyWrapper.body)
+                  eventModel.getResponse.setTransferEncoding(bodyWrapper.transferEncoding)
+                case _ => eventModel.getResponse.setBody(utf8String)
               }
-
-              advancedConfig.identifyUser(requestHeader, result).map { userId =>
-                eventModelBuilder.userId(userId)
-              }
-
-              advancedConfig.identifyCompany(requestHeader, result).map { companyId =>
-                eventModelBuilder.companyId(companyId)
-              }
-
-              val metadata = advancedConfig.getMetadata(requestHeader, result)
-              if (metadata.nonEmpty) {
-                eventModelBuilder.metadata(metadata)
-              }
-
-              val eventModel = eventModelBuilder.build()
-              sendEvent(eventModel, advancedConfig)
-
             }
           }
-        } match {
-          case Success(_) => Unit
-          case Failure(ex) => logger.log(Level.WARNING, s"failed to send API events to Moesif: ${ex.getMessage}", ex)
+
+          Try {
+            sendEvent(eventModel, advancedConfig)
+          } match {
+            case Success(_) => Unit
+            case Failure(ex) => logger.log(Level.WARNING, s"failed to send API events to Moesif: ${ex.getMessage}", ex)
+          }
         }
-        result
+
+        if (blockedModifiedResultOpt.isEmpty) {
+          result
+        }
+        else {
+          blockedModifiedResultOpt.get
+        }
       }
     }
   }
@@ -167,22 +196,22 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
       if (sampleRateToUse >= randomPercentage) {
         eventModelMasked.setWeight(math.floor(100 / sampleRateToUse).toInt) // note: sampleRateToUse cannot be 0 at this point
         if(eventModelBuffer.size >= maxApiEventsToHoldInMemory){
-          logger.log(Level.WARNING, s"Skipped Event due to event buffer size [${eventModelBuffer.size}] is over max ApiEventsToHoldInMemory ${maxApiEventsToHoldInMemory}")
+          logger.log(Level.WARNING, s"[Moesif] Skipped Event due to event buffer size [${eventModelBuffer.size}] is over max ApiEventsToHoldInMemory ${maxApiEventsToHoldInMemory}")
         }else{
-          eventModelBuffer += eventModelMasked
+          eventModelBuffer.append(eventModelMasked)
         }
       } else {
         if(debug) {
-          logger.log(Level.INFO, "Skipped Event due to sampleRateToUse - " + sampleRateToUse.toString + " and randomPercentage " + randomPercentage.toString)
+          logger.log(Level.INFO, "[Moesif] Skipped Event due to sampleRateToUse - " + sampleRateToUse.toString + " and randomPercentage " + randomPercentage.toString)
         }
       }
 
       // scheduledSend below should flush the event buffer after maxBatchTime; however, we check the time here and
       // send immediately if that didn't already happen and it's time to send
       // this also has the effect of sending immediately if we are sending fewer than one event per maxBatchTime
-      if (eventModelBuffer.size >= maxApiEventsToHoldInMemory || isAfterMaxBatchTime()) {
+      if (eventModelBuffer.size >= batchSize || isAfterMaxBatchTime()) {
         if(debug){
-          logger.log(Level.INFO, s"flush events because of bucket full or time over maxBatchTime [${eventModelBuffer.size}/${maxApiEventsToHoldInMemory}] - [${System.currentTimeMillis() - lastSendTime}/${maxBatchTime}]")
+          logger.log(Level.INFO, s"[Moesif] flush events because of bucket full or time over maxBatchTime [${eventModelBuffer.size}/${maxApiEventsToHoldInMemory}] - [${System.currentTimeMillis() - lastSendTime}/${maxBatchTime}]")
         }
         flushEventBuffer()
       } else {
@@ -203,7 +232,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   def setScheduleBufferFlush(): Unit = {
     if (!isSendScheduled()) {
       if(debug){
-        logger.log(Level.WARNING, s"Scheduler is set for ${maxBatchTime} later...")
+        logger.log(Level.WARNING, s"[Moesif] Scheduler is set for ${maxBatchTime/1000} seconds later...")
       }
       scheduleBufferFlush()
     }
@@ -212,74 +241,53 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   def cancelScheduleBufferFlush(): Unit = {
     if (isSendScheduled()) {
       if(debug){
-        logger.log(Level.WARNING, "cancelling schedule to flush events")
+        logger.log(Level.WARNING, "[Moesif] Cancelling schedule to flush events")
       }
       scheduledSend.cancel(false)
     }
   }
 
-    def flushEventBuffer(): Unit = synchronized {
+  def addBackEvents(sendingEvents: Seq[EventModel]): Unit = {
+    if (maxApiEventsToHoldInMemory >= eventModelBuffer.size + sendingEvents.size) {
+      eventModelBuffer ++= sendingEvents
+    } else {
+      logger.log(Level.WARNING, s"[Moesif] ${sendingEvents.size} Skipped Events due to event buffer size [${eventModelBuffer.size}] is over max ApiEventsToHoldInMemory ${maxApiEventsToHoldInMemory}")
+    }
+  }
+
+  def flushEventBuffer(): Unit = synchronized {
     if (eventModelBuffer.nonEmpty) {
-      val flushSize = eventModelBuffer.size
+      val eventModelCache: mutable.ArrayBuffer[EventModel] = eventModelBuffer.clone()
+      eventModelBuffer.clear()
       lastSendTime = System.currentTimeMillis()
-      val callBack = new APICallBack[HttpResponse] {
-        def onSuccess(context: HttpContext, response: HttpResponse): Unit = {
-          if (context.getResponse.getStatusCode != 201) {
-            logger.log(Level.WARNING, s"[Moesif] server returned status:${context.getResponse.getStatusCode} while sending API events [${flushSize}/${maxApiEventsToHoldInMemory}]")
+
+      while(eventModelCache.nonEmpty){
+        val sendingEvents: Seq[EventModel] = eventModelCache.take(batchSize)
+        eventModelCache --= sendingEvents
+        val callBack: APICallBack[HttpResponse] = new APICallBack[HttpResponse] {
+          def onSuccess(context: HttpContext, response: HttpResponse): Unit = {
+            if (context.getResponse.getStatusCode != 201) {
+              logger.log(Level.WARNING, s"[Moesif] server returned status:${context.getResponse.getStatusCode} while sending API events [${sendingEvents.size}/${batchSize}]")
+              addBackEvents(sendingEvents)
+              setScheduleBufferFlush()
+            }
+            else {
+              logger.log(Level.INFO, s"[Moesif] sent [${sendingEvents.size}/${batchSize}] events successfully | queue size: [${eventModelBuffer.size}/$maxApiEventsToHoldInMemory]")
+              // if this was called while a scheduled send task was still live, cancel it because we just sent
+              cancelScheduleBufferFlush()
+              setScheduleBufferFlush()
+            }
+          }
+          def onFailure(context: HttpContext, ex: Throwable): Unit = {
+            logger.log(Level.WARNING, s"[Moesif] failed to send API events [flushSize: ${sendingEvents.size}/${batchSize}] [ArrayBuffer size: ${eventModelBuffer.size}/${maxApiEventsToHoldInMemory}] to Moesif: ${ex.getMessage}", ex)
+            addBackEvents(sendingEvents)
             setScheduleBufferFlush()
           }
-          else{
-            logger.log(Level.INFO, s"[Moesif] sent [${flushSize}/${maxApiEventsToHoldInMemory}] events successfully")
-            // if this was called while a scheduled send task was still live, cancel it because we just sent
-            cancelScheduleBufferFlush()
-
-            try{
-              if (eventModelBuffer.nonEmpty) {
-                eventModelBuffer.remove(0, flushSize)
-              }
-            }
-            catch {
-              case ex: Exception =>
-                // logger.log(Level.WARNING, s"[Moesif] Error when remove flushed events [flushSize: ${flushSize}/${maxApiEventsToHoldInMemory}] [Current ArrayBuffer size after flushing: ${eventModelBuffer.size}] to Moesif: ${ex.getMessage}", ex)
-            }
-            // TODO remove try exception after debugging on remove out of bounds issue
-          }
         }
-        def onFailure(context: HttpContext, ex: Throwable): Unit = {
-          logger.log(Level.WARNING, "[moesif] DEBUG events sent ...")
-          if(eventModelBuffer.nonEmpty){
-            val event = eventModelBuffer.head
-            if (ex.getMessage.contains("failed to respond") || ex.getMessage.contains("api-dev.moesif.net:443")) {
 
-              val reqUrl = Try(event.getRequest.getUri).getOrElse("NotAvailable")
-              val reqBody = Try(event.getRequest.getBody).getOrElse("NotAvailable")
-              val reqHeader = Try(event.getRequest.getHeaders).getOrElse("NotAvailable")
-
-              logger.log(Level.WARNING, s"reqUrl: $reqUrl")
-              logger.log(Level.WARNING, s"reqBody: $reqBody")
-              logger.log(Level.WARNING, s"reqHeader: $reqHeader")
-
-              if (event.getResponse == null) {
-                logger.log(Level.WARNING, "event.getResponse is null")
-              } else {
-                val respStatus = Try(event.getResponse.getStatus).getOrElse("NotAvailable")
-                val respBody = Try(event.getResponse.getBody).getOrElse("NotAvailable")
-                val respHeader = Try(event.getResponse.getHeaders).getOrElse("NotAvailable")
-
-                logger.log(Level.WARNING, s"-----------------------------------------------------------------")
-                logger.log(Level.WARNING, s"respStatus: $respStatus")
-                logger.log(Level.WARNING, s"respHeader: $respHeader")
-                logger.log(Level.WARNING, s"respBody: $respBody")
-              }
-            }
-          }
-
-          logger.log(Level.WARNING, s"[Moesif] failed to send API events [flushSize: ${flushSize}/${maxApiEventsToHoldInMemory}] [ArrayBuffer size: ${eventModelBuffer.size}] to Moesif: ${ex.getMessage}", ex)
-          setScheduleBufferFlush()
-        }
+        val events = sendingEvents.asJava
+        moesifApi.createEventsBatchAsync(events, callBack, useGzip)
       }
-      val events = eventModelBuffer.asJava
-      moesifApi.createEventsBatchAsync(events, callBack, useGzip)
     }
   }
 
