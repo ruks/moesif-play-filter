@@ -13,7 +13,7 @@ lazy val repoUrl = sys.env.get("REPO_PUBLISH_URL").getOrElse("Please set env var
 sonatypeProfileName := sys.env.get("SONATYPE_PROFILE_NAME").getOrElse("Please set env var: SONATYPE_PROFILE_NAME")
 credentials += Credentials(repoCredsRealm, repoCredsHost, repoCredsUser, repoCredsPassword)
 
-if (repoCredsHost.toLowerCase().contains("oss.sonatype.org".toLowerCase())) {
+if (repoCredsHost.toLowerCase().contains("ossrh-staging-api.central.sonatype.com".toLowerCase())) {
     publishTo := sonatypePublishToBundle.value
 }
 else {

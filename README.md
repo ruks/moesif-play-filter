@@ -19,7 +19,7 @@ without importing framework specific dependencies. Any Web Application built on 
 For SBT users, add dependency to your `build.sbt`:
 
 ```bash
-libraryDependencies += "com.moesif.filter" % "moesif-play-filter" % "1.16.0"
+libraryDependencies += "com.moesif.filter" %% "moesif-play-filter" % "1.18.0"
 ```
 
 For Maven users, add dependency to your `pom.xml`:
@@ -27,8 +27,8 @@ For Maven users, add dependency to your `pom.xml`:
 ```xml
 <dependency>
     <groupId>com.moesif.filter</groupId>
-    <artifactId>moesif-play-filter</artifactId>
-    <version>1.16.0</version>
+    <artifactId>moesif-play-filter_2.12</artifactId>
+    <version>1.18.0</version>
 </dependency>
 ```
 
@@ -36,7 +36,7 @@ For Gradle users, add the Moesif dependency to your project's build.gradle file:
 
 ```gradle
 dependencies {   
-    compile 'com.moesif.filter:moesif-play-filter:1.16.0'
+    compile 'com.moesif.filter:moesif-play-filter_2.12:1.18.0'
 }
 ```
 
