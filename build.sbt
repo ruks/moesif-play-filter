@@ -38,5 +38,5 @@ organizationHomepage := Some(url("http://www.moesif.com/"))
 homepage := Some(url("https://github.com/Moesif/moesif-play-filter"))
 developers += Developer("moesif", "Moesif API", "support@moesif.com", url("https://www.moesif.com"))
 
-scalaVersion := "2.12.7"
-crossScalaVersions := Seq("2.12.7", "2.11.8")
+scalaVersion := "2.12.20"
+crossScalaVersions := Seq("2.12.20", "2.11.8")
