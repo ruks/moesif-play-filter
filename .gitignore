@@ -23,6 +23,8 @@ orientdb-client.ts
 ## Directory-based project format:
 .idea/
 .bsp/
+.metals/
+.vscode/
 
 # Mongo Explorer plugin:
 # .idea/mongoSettings.xml
