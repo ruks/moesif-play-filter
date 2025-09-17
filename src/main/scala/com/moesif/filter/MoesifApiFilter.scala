@@ -57,7 +57,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   // Initialize with a ScheduledFuture[_] that fires immediately, doing nothing
   private var scheduledSend: ScheduledFuture[_] = exec.schedule(eventBufferFlusher, 0, TimeUnit.MILLISECONDS)
 
-  private val logger = Logger.getLogger("moesif.play.filter.MoesifApiFilter")
+  private val logger = Logger.getLogger(getClass.getName)
   logger.log(Level.WARNING, s"MoesifApiFilter config is $config")
 
   def apply(nextFilter: EssentialAction) = new EssentialAction {
@@ -235,7 +235,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
   def setScheduleBufferFlush(): Unit = {
     if (!isSendScheduled()) {
       if(debug){
-        logger.log(Level.WARNING, s"[Moesif] Scheduler is set for ${maxBatchTime/1000} seconds later...")
+        logger.log(Level.INFO, s"[Moesif] Scheduler is set for ${maxBatchTime/1000} seconds later...")
       }
       scheduleBufferFlush()
     }
@@ -272,13 +272,18 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
 
         val callBack: APICallBack[HttpResponse] = new APICallBack[HttpResponse] {
           def onSuccess(context: HttpContext, response: HttpResponse): Unit = {
-            if (context.getResponse.getStatusCode != 201) {
-              logger.log(Level.WARNING, s"[Moesif] server returned status:${context.getResponse.getStatusCode} while sending API events [${sendingEvents.size}/${batchSize}]")
-              addBackEvents(sendingEvents)
+            // we dont expect any non 2xx status codes onSuccess, but just to be safe
+            val httpStatusCode: Int = Try(context.getResponse.getStatusCode).getOrElse(0)
+            val isRetriable = isRetriableStatusCode(httpStatusCode)
+            val retryMessage = if (isRetriable) "will retry" else "will DROP events"
+            if (httpStatusCode != 201) {
+              logger.log(Level.WARNING, s"[Moesif] onSuccess server returned ${retryMessage} statusCode - ${httpStatusCode} while sending API events [${sendingEvents.size}/${batchSize}]")
+              if (isRetriable)
+                addBackEvents(sendingEvents)
               setScheduleBufferFlush()
             }
             else {
-              logger.log(Level.INFO, s"[Moesif] sent [${sendingEvents.size}/${batchSize}] events successfully | queue size: [${eventModelBuffer.size}/$maxApiEventsToHoldInMemory]")
+              logger.log(Level.INFO, s"[Moesif] sent [${sendingEvents.size}/${batchSize}] events successfully | queue size: [${eventModelBuffer.size}/$maxApiEventsToHoldInMemory] statusCode - ${httpStatusCode}")
               // if this was called while a scheduled send task was still live, cancel it because we just sent
               cancelScheduleBufferFlush()
               setScheduleBufferFlush()
@@ -289,8 +294,12 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
               val eventmodelMsg = "sendingEvents: " + sendingEvents.map(logEventModelHelper).mkString(",")
               logger.log(Level.WARNING, eventmodelMsg)
             }
-            logger.log(Level.WARNING, s"[Moesif] failed to send API events [flushSize: ${sendingEvents.size}/${batchSize}] [ArrayBuffer size: ${eventModelBuffer.size}/${maxApiEventsToHoldInMemory}] [company ids: ${companyIds}] to Moesif: ${ex.getMessage}", ex)
-            addBackEvents(sendingEvents)
+            val httpStatusCode: Int = Try(context.getResponse.getStatusCode).getOrElse(0)
+            val isRetriable = isRetriableStatusCode(httpStatusCode)
+            val retryMessage = if (isRetriable) "will retry" else "will DROP events"
+            logger.log(Level.WARNING, s"[Moesif] failed to send API events ${retryMessage} statusCode - ${httpStatusCode} [flushSize: ${sendingEvents.size}/${batchSize}] [ArrayBuffer size: ${eventModelBuffer.size}/${maxApiEventsToHoldInMemory}] [company ids: ${companyIds}] to Moesif: ${ex.getClass.getName}:${ex.getMessage}")
+            if (isRetriable)
+              addBackEvents(sendingEvents)
             setScheduleBufferFlush()
           }
         }
@@ -298,6 +307,14 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
         val events = sendingEvents.asJava
         moesifApi.createEventsBatchAsync(events, callBack, useGzip)
       }
+    }
+  }
+
+  def isRetriableStatusCode(statusCode: Int): Boolean = {
+    statusCode match {
+      case 408 | 429 => true
+      case _ if statusCode >= 500 && statusCode <= 599 => true
+      case _ => false
     }
   }
 
