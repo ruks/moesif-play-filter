@@ -21,14 +21,14 @@ object MoesifApiFilterConfig {
     val batchSize = config.getOptional[Int]("batchSize").getOrElse(200)
     val reqBodyProcessing = config.getOptional[Boolean]("requestBodyProcessingEnabled").getOrElse(false)
     val resBodyProcessing = config.getOptional[Boolean]("responseBodyProcessingEnabled").getOrElse(false)
-    val reqBodySizeLimit = config.getOptional[Int]("requestBodySizeLimit").getOrElse(3000000)
-    val resBodySizeLimit = config.getOptional[Int]("responseBodySizeLimit").getOrElse(3000000)
+    val reqBodySizeLimit = config.getOptional[Int]("requestBodySizeLimit").getOrElse(100000)
+    val resBodySizeLimit = config.getOptional[Int]("responseBodySizeLimit").getOrElse(100000)
     val debug = config.getOptional[Boolean]("debug").getOrElse(false)
     val maxBatchTime = config.getOptional[Int]("maxBatchTime").getOrElse(2000)
     val moesifApplicationId = config.get[String]("moesifApplicationId")
     val moesifCollectorEndpoint = config.get[String]("collectorEndpoint")
     val useGzip = config.getOptional[Boolean]("useGzip").getOrElse(false)
-    val maxBatchSize = config.getOptional[Int]("maxBatchSize").getOrElse(9000000)
+    val maxBatchSize = config.getOptional[Int]("maxBatchSize").getOrElse(100000000)
     MoesifApiFilterConfig(maxApiEventsToHoldInMemory, batchSize, moesifApplicationId, reqBodyProcessing, moesifCollectorEndpoint, maxBatchTime, useGzip, debug, resBodyProcessing, reqBodySizeLimit, resBodySizeLimit, maxBatchSize)
   }
 }
