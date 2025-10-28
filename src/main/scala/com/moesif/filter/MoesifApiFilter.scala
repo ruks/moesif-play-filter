@@ -4,10 +4,11 @@ import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Materializer}
 import akka.util.ByteString
+import com.moesif.api.controllers.APIController
 import com.moesif.api.http.client.{APICallBack, HttpContext}
 import com.moesif.api.http.response.HttpResponse
 import com.moesif.api.models._
-import com.moesif.api.{APIHelper, Base64, MoesifAPIClient, BodyParser => MoesifBodyParser}
+import com.moesif.api.{APIHelper, Base64, IAPIController, MoesifAPIClient, BodyParser => MoesifBodyParser}
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler
 import play.api.Configuration
 import play.api.http.HttpEntity
@@ -100,7 +101,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
           val reqContentLength: Int = reqHeaders.entrySet().asScala
             .find(entry => entry.getKey.equalsIgnoreCase("Content-Length"))
               .map(entry => Try(entry.getValue.toInt).getOrElse(buffer.length))
-              .getOrElse(0)
+              .getOrElse(buffer.length)
 
           val reqBodyParsed = MoesifBodyParser.parseBody(reqHeaders, requestBodyStr)
           if (reqContentLength < reqBodySizeLimit) {
@@ -170,7 +171,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
               val resContentLength:Int = resultHeaders.entrySet().asScala
                 .find(entry => entry.getKey.equalsIgnoreCase("Content-Length"))
                 .map(entry => Try(entry.getValue.toInt).getOrElse(utf8String.length))
-                .getOrElse(0)
+                .getOrElse(utf8String.length)
 
               if (resContentLength < resBodySizeLimit) {
                 Try(MoesifBodyParser.parseBody(resultHeaders, utf8String)) match {
@@ -207,6 +208,9 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
     }
   }
 
+  def getEventBuffer() : Seq[EventModel] = synchronized {
+    eventModelBuffer.toSeq
+  }
 
   def sendEvent(eventModel: EventModel, advancedConfig: MoesifAdvancedFilterConfiguration): Unit = synchronized {
       val randomPercentage = Math.random * 100
@@ -330,7 +334,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
           }
         }
         val events = sendingEvents.asJava
-        moesifApi.createEventsBatchAsync(events, callBack, useGzip)
+//        moesifApi.createEventsBatchAsync(events, callBack, useGzip)
       }
     }
   }
