@@ -334,7 +334,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
           }
         }
         val events = sendingEvents.asJava
-//        moesifApi.createEventsBatchAsync(events, callBack, useGzip)
+        moesifApi.createEventsBatchAsync(events, callBack, useGzip)
       }
     }
   }
