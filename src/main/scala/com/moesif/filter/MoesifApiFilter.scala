@@ -4,11 +4,10 @@ import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Materializer}
 import akka.util.ByteString
-import com.moesif.api.controllers.APIController
 import com.moesif.api.http.client.{APICallBack, HttpContext}
 import com.moesif.api.http.response.HttpResponse
 import com.moesif.api.models._
-import com.moesif.api.{APIHelper, Base64, IAPIController, MoesifAPIClient, BodyParser => MoesifBodyParser}
+import com.moesif.api.{APIHelper, Base64, MoesifAPIClient, BodyParser => MoesifBodyParser}
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler
 import play.api.Configuration
 import play.api.http.HttpEntity
@@ -22,7 +21,8 @@ import java.util.logging._
 import javax.inject.{Inject, Singleton}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.util.{Failure, Random, Success, Try}
+import scala.concurrent.ExecutionContext
+import scala.util.{Failure, Success, Try}
 /**
   * MoesifApiFilter
   * logs API calls and sends to Moesif for API analytics and log analysis.
@@ -100,8 +100,8 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
           val requestBodyStr = new String(buffer)
           val reqContentLength: Int = reqHeaders.entrySet().asScala
             .find(entry => entry.getKey.equalsIgnoreCase("Content-Length"))
-              .map(entry => Try(entry.getValue.toInt).getOrElse(buffer.length))
-              .getOrElse(buffer.length)
+            .map(entry => Try(entry.getValue.toInt).getOrElse(buffer.length))
+            .getOrElse(buffer.length)
 
           val reqBodyParsed = MoesifBodyParser.parseBody(reqHeaders, requestBodyStr)
           if (reqContentLength < reqBodySizeLimit) {
@@ -168,7 +168,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
           else if (responseBodyParsingEnabled) {
             result.body.consumeData.map { resultBodyByteString =>
               val utf8String = resultBodyByteString.utf8String
-              val resContentLength:Int = resultHeaders.entrySet().asScala
+              val resContentLength: Int = resultHeaders.entrySet().asScala
                 .find(entry => entry.getKey.equalsIgnoreCase("Content-Length"))
                 .map(entry => Try(entry.getValue.toInt).getOrElse(utf8String.length))
                 .getOrElse(utf8String.length)
@@ -187,7 +187,7 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
                   case _ => eventModel.getResponse.setBody(utf8String)
                 }
               }
-            }
+            }(SameThreadExecutionContext)
           }
 
           Try {
@@ -206,6 +206,11 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
         }
       }
     }
+  }
+
+  object SameThreadExecutionContext extends ExecutionContext {
+    def execute(runnable: Runnable): Unit = runnable.run()
+    def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
   }
 
   def getEventBuffer() : Seq[EventModel] = synchronized {
