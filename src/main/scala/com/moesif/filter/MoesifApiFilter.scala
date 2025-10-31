@@ -296,7 +296,6 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
         var sendingEvents: Seq[EventModel] = eventModelCache.take(batchSize)
         var sendingEventsSize = APIHelper.serialize(sendingEvents).getBytes.length
         while (sendingEventsSize >= maxBatchSize) {
-          // if the batch size exceeds maxBatchSize, reduce the batch size by half
           val reducedSize = sendingEvents.size * 0.9 // reduce the number of events by 10%
           sendingEvents = eventModelCache.take(reducedSize.toInt)
           sendingEventsSize = APIHelper.serialize(sendingEvents).getBytes.length

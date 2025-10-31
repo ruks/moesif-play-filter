@@ -20,7 +20,7 @@ object MoesifApiFilterConfig {
     val maxApiEventsToHoldInMemory = config.getOptional[Int]("maxApiEventsToHoldInMemory").getOrElse(100000)
     val batchSize = config.getOptional[Int]("batchSize").getOrElse(200)
     val reqBodyProcessing = config.getOptional[Boolean]("requestBodyProcessingEnabled").getOrElse(false)
-    val resBodyProcessing = config.getOptional[Boolean]("responseBodyProcessingEnabled").getOrElse(false)
+    val resBodyProcessing = config.getOptional[Boolean]("responseBodyProcessingEnabled").getOrElse(true)
     val reqBodySizeLimit = config.getOptional[Int]("requestBodySizeLimit").getOrElse(100000)
     val resBodySizeLimit = config.getOptional[Int]("responseBodySizeLimit").getOrElse(100000)
     val debug = config.getOptional[Boolean]("debug").getOrElse(false)
