@@ -210,7 +210,9 @@ class MoesifApiFilter @Inject()(config: MoesifApiFilterConfig)(implicit mat: Mat
 
   object SameThreadExecutionContext extends ExecutionContext {
     def execute(runnable: Runnable): Unit = runnable.run()
-    def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
+    def reportFailure(cause: Throwable): Unit = {
+      logger.log(Level.WARNING, s"Same thread execution context failure in MoesifApiFilter: ${cause.getMessage}", cause)
+    }
   }
 
   def getEventBuffer() : Seq[EventModel] = synchronized {
